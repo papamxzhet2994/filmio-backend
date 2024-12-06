@@ -53,6 +53,22 @@ public class UserController {
         }
     }
 
+    @PostMapping("/{id}/verify-password")
+    public ResponseEntity<Void> verifyPassword(@PathVariable Long id, @RequestBody Map<String, String> payload) {
+        String password = payload.get("password");
+        if (password == null) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        boolean isValid = userService.verifyPassword(id, password);
+        if (isValid) {
+            return ResponseEntity.ok().build();
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+    }
+
+
 
     @PostMapping("/{id}/upload-avatar")
     public ResponseEntity<String> uploadAvatar(@PathVariable Long id,

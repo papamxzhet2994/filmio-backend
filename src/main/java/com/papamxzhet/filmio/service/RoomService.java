@@ -31,9 +31,12 @@ public class RoomService {
 
     @Transactional
     public Room createRoom(String name, String owner, String rawPassword, boolean isClosed) {
-        String encodedPassword = rawPassword != null ? passwordEncoder.encode(rawPassword) : null;
+        String encodedPassword = (rawPassword != null && !rawPassword.trim().isEmpty())
+                ? passwordEncoder.encode(rawPassword)
+                : null;
+
         Room room = new Room(name, owner, encodedPassword);
-        room.setClosed(isClosed); // Устанавливаем статус закрытости комнаты
+        room.setClosed(isClosed);
         return roomRepository.save(room);
     }
 
@@ -59,6 +62,12 @@ public class RoomService {
     public Room updateRoomPassword(Room room, String newRawPassword) {
         String encodedPassword = passwordEncoder.encode(newRawPassword);
         room.setPassword(encodedPassword);
+        return roomRepository.save(room);
+    }
+
+    @Transactional
+    public Room updateRoomName(Room room, String newName) {
+        room.setName(newName);
         return roomRepository.save(room);
     }
 

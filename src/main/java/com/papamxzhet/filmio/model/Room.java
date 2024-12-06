@@ -1,5 +1,7 @@
 package com.papamxzhet.filmio.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
@@ -25,12 +27,12 @@ public class Room {
     @NotBlank
     private String owner;
 
+    // Скрываем поле password в ответах API
+    @JsonIgnore
     private String password;
 
     private boolean isClosed;
 
-    @Setter
-    @Getter
     @Transient
     private int participantCount;
 
@@ -46,5 +48,11 @@ public class Room {
         this.owner = owner;
         this.password = password;
         this.isClosed = false;
+    }
+
+    // Геттер для поля hasPassword, которое зависит от password
+    @JsonProperty("hasPassword")
+    public boolean isHasPassword() {
+        return password != null && !password.isEmpty();
     }
 }

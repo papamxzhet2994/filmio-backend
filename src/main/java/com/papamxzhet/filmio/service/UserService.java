@@ -81,6 +81,11 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    public boolean verifyPassword(Long userId, String password) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+        return passwordEncoder.matches(password, user.getPassword());
+    }
 
 
     public void updateAvatar(Long userId, String avatarUrl) {

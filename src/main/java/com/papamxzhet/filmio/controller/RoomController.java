@@ -39,16 +39,36 @@ public class RoomController {
 
     // Получение списка всех комнат
     @GetMapping
-    public List<Room> getAllRooms() {
-        return roomService.getAllRooms();
+    public List<RoomResponse> getAllRooms() {
+        List<Room> rooms = roomService.getAllRooms();
+        return rooms.stream()
+                .map(room -> new RoomResponse(
+                        room.getId(),
+                        room.getName(),
+                        room.getOwner(),
+                        room.isHasPassword(), // Проверяем наличие пароля
+                        room.isClosed(),
+                        room.getParticipantCount()
+                ))
+                .toList();
     }
 
     // Получение комнаты по ID
     @GetMapping("/{id}")
-    public Room getRoomById(@PathVariable UUID id) {
-        return roomService.getRoomById(id)
+    public RoomResponse getRoomById(@PathVariable UUID id) {
+        Room room = roomService.getRoomById(id)
                 .orElseThrow(() -> new RuntimeException("Room not found"));
+
+        return new RoomResponse(
+                room.getId(),
+                room.getName(),
+                room.getOwner(),
+                room.isHasPassword(), // Проверяем, есть ли пароль
+                room.isClosed(),
+                room.getParticipantCount()
+        );
     }
+
 
     // Проверка пароля для комнаты
     @PostMapping("/{id}/check-password")
@@ -75,6 +95,23 @@ public class RoomController {
 
         return roomService.updateRoomPassword(room, request.getNewPassword());
     }
+
+    // Обновление имени комнаты
+    @PutMapping("/{id}/update-name")
+    public Room updateRoomName(
+            @PathVariable UUID id,
+            @RequestBody RoomNameUpdateRequest request,
+            Authentication authentication) {
+        Room room = roomService.getRoomById(id)
+                .orElseThrow(() -> new RuntimeException("Room not found"));
+
+        if (!room.getOwner().equals(authentication.getName())) {
+            throw new RuntimeException("You are not the owner of this room");
+        }
+
+        return roomService.updateRoomName(room, request.getName());
+    }
+
 
     // Удаление комнаты
     @DeleteMapping("/{id}")
