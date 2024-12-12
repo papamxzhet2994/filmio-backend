@@ -33,6 +33,8 @@ public class Room {
 
     private boolean isClosed;
 
+    private String avatarUrl;
+
     @Transient
     private int participantCount;
 

@@ -14,14 +14,16 @@ public class RoomResponse {
     private boolean hasPassword;
     private boolean isClosed;
     private int participantCount;
+    private String avatarUrl;
 
-    public RoomResponse(UUID id, String name, String owner, boolean hasPassword, boolean isClosed, int participantCount) {
+    public RoomResponse(UUID id, String name, String owner, boolean hasPassword, boolean isClosed, int participantCount, String avatarUrl) {
         this.id = id;
         this.name = name;
         this.owner = owner;
         this.hasPassword = hasPassword;
         this.isClosed = isClosed;
         this.participantCount = participantCount;
+        this.avatarUrl = avatarUrl;
     }
 }
 

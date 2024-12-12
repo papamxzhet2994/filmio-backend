@@ -8,7 +8,13 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -29,6 +35,8 @@ public class RoomService {
 
     private final ConcurrentHashMap<UUID, CopyOnWriteArrayList<String>> participantsMap = new ConcurrentHashMap<>();
 
+    private final ConcurrentHashMap<UUID, VideoControlMessage> videoStateMap = new ConcurrentHashMap<>();
+
     @Transactional
     public Room createRoom(String name, String owner, String rawPassword, boolean isClosed) {
         String encodedPassword = (rawPassword != null && !rawPassword.trim().isEmpty())
@@ -37,7 +45,12 @@ public class RoomService {
 
         Room room = new Room(name, owner, encodedPassword);
         room.setClosed(isClosed);
-        return roomRepository.save(room);
+
+        Room savedRoom = roomRepository.save(room);
+
+        initializeVideoState(savedRoom.getId());
+
+        return savedRoom;
     }
 
 
@@ -100,6 +113,39 @@ public class RoomService {
     }
 
     public void broadcastVideoControl(VideoControlMessage message) {
+        System.out.println("Отправка сообщения в /topic/video/" + message.getRoomId() + ": " + message);
         messagingTemplate.convertAndSend("/topic/video/" + message.getRoomId(), message);
     }
+
+    public void initializeVideoState(UUID roomId) {
+        videoStateMap.putIfAbsent(roomId, new VideoControlMessage(roomId.toString(), "", 0, VideoControlMessage.VideoControlType.PAUSE));
+    }
+
+    public Optional<VideoControlMessage> getCurrentVideoState(UUID roomId) {
+        return Optional.ofNullable(videoStateMap.get(roomId));
+    }
+
+    public void updateVideoState(UUID roomId, VideoControlMessage message) {
+        videoStateMap.put(roomId, message);
+    }
+
+    public String saveAvatar(MultipartFile file) throws IOException {
+        if (file.isEmpty()) {
+            throw new RuntimeException("File is empty");
+        }
+
+        String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
+        String uploadDir = "uploads/avatars/";
+        Path filePath = Paths.get(uploadDir, fileName);
+        Files.createDirectories(filePath.getParent());
+        Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+        return "uploads/avatars/" + fileName; // URL для доступа к файлу
+    }
+
+    @Transactional
+    public Room updateRoom(Room room) {
+        return roomRepository.save(room);
+    }
+
 }
