@@ -1,6 +1,8 @@
 package com.papamxzhet.filmio.controller;
 
 import com.papamxzhet.filmio.model.SocialLink;
+import com.papamxzhet.filmio.model.User;
+import com.papamxzhet.filmio.payload.UserProfileResponse;
 import com.papamxzhet.filmio.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -118,6 +120,26 @@ public class UserController {
     public ResponseEntity<List<SocialLink>> getSocialLinks(@PathVariable Long id) {
         List<SocialLink> links = userService.getSocialLinks(id);
         return ResponseEntity.ok(links);
+    }
+
+    @GetMapping("/{username}")
+    public ResponseEntity<UserProfileResponse> getUserProfile(@PathVariable String username) {
+        User user = userService.getUserByUsername(username)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        String socialLinksJson = user.getSocialLinks()
+                .stream()
+                .map(link -> String.format("{\"name\": \"%s\", \"url\": \"%s\"}", link.getName(), link.getUrl()))
+                .reduce("[", (acc, link) -> acc.equals("[") ? acc + link : acc + "," + link) + "]";
+
+        UserProfileResponse response = new UserProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                user.getAvatarUrl(),
+                socialLinksJson,
+                user.getCreatedAt()
+        );
+        return ResponseEntity.ok(response);
     }
 
 }

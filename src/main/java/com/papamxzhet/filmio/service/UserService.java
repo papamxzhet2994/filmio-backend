@@ -66,7 +66,6 @@ public class UserService {
         // Delete associated social links
         socialLinkRepository.deleteAllByUserId(userId);
 
-        // Remove the avatar file if it exists
         if (user.getAvatarUrl() != null) {
             String avatarPath = user.getAvatarUrl().replace("/uploads/", "uploads/");
             Path filePath = Paths.get(avatarPath);
@@ -76,8 +75,6 @@ public class UserService {
                 throw new RuntimeException("Ошибка при удалении аватара: " + e.getMessage());
             }
         }
-
-        // Delete the user record
         userRepository.delete(user);
     }
 
@@ -129,6 +126,11 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         return socialLinkRepository.findByUserId(user.getId());
+    }
+
+
+    public Optional<User> getUserByUsername(String username) {
+        return userRepository.findByUsername(username);
     }
 
 }
