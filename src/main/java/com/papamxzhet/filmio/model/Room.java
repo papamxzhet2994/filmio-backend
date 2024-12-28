@@ -27,7 +27,6 @@ public class Room {
     @NotBlank
     private String owner;
 
-    // Скрываем поле password в ответах API
     @JsonIgnore
     private String password;
 

@@ -5,6 +5,7 @@ import com.papamxzhet.filmio.model.VideoControlMessage;
 import com.papamxzhet.filmio.payload.*;
 import com.papamxzhet.filmio.service.RoomService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -200,20 +201,28 @@ public class RoomController {
     // Уведомление участников о изменениях
     private void notifyParticipantsChange(UUID roomId) {
         List<String> participants = roomService.getParticipants(roomId);
+        System.out.println("Список участников комнаты после изменений: " + participants);
         messagingTemplate.convertAndSend("/topic/participants/" + roomId, participants);
     }
 
     @PostMapping("/{id}/remove-participant")
-    public void removeParticipant(@PathVariable UUID id, @RequestBody ParticipantRemoveRequest request, Authentication authentication) {
+    public ResponseEntity<String> removeParticipant(
+            @PathVariable UUID id,
+            @RequestBody ParticipantRemoveRequest request,
+            Authentication authentication) {
+        System.out.println("Запрос на удаление участника: " + request.getUsername());
+
         Room room = roomService.getRoomById(id)
                 .orElseThrow(() -> new RuntimeException("Комната не найдена"));
 
         if (!room.getOwner().equals(authentication.getName())) {
-            throw new RuntimeException("Вы не являетесь владельцем этой комнаты");
+            throw new RuntimeException("Вы не являетесь владельцем этой комнаты.");
         }
 
         roomService.removeParticipant(id, request.getUsername());
-        notifyParticipantsChange(id);
+        System.out.println("Участник удалён: " + request.getUsername());
+
+        return ResponseEntity.ok("Участник успешно удалён.");
     }
 
     @PostMapping("/{id}/upload-avatar")

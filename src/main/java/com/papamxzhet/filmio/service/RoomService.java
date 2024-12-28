@@ -48,6 +48,7 @@ public class RoomService {
 
         Room savedRoom = roomRepository.save(room);
 
+        participantsMap.putIfAbsent(savedRoom.getId(), new CopyOnWriteArrayList<>()); // Инициализация участников
         initializeVideoState(savedRoom.getId());
 
         return savedRoom;
@@ -57,6 +58,7 @@ public class RoomService {
     public List<Room> getAllRooms() {
         List<Room> rooms = roomRepository.findAll();
         for (Room room : rooms) {
+            participantsMap.putIfAbsent(room.getId(), new CopyOnWriteArrayList<>());
             room.setParticipantCount(getParticipants(room.getId()).size());
         }
         return rooms;
@@ -97,10 +99,29 @@ public class RoomService {
 
     public void removeParticipant(UUID roomId, String username) {
         List<String> participants = participantsMap.get(roomId);
-        if (participants != null && participants.remove(username)) {
+
+        if (participants == null) {
+            throw new RuntimeException("Список участников комнаты отсутствует.");
+        }
+
+        if (participants.remove(username)) {
+            System.out.println("Участник " + username + " удалён из комнаты " + roomId + ".");
+
+            // Уведомляем всех участников об обновлении
             notifyParticipantsChange(roomId);
+
+            // Отправляем уведомление удалённому участнику
+            messagingTemplate.convertAndSendToUser(
+                    username,
+                    "/queue/removed",
+                    "Вы были удалены из комнаты."
+            );
+        } else {
+            System.out.println("Участник " + username + " не найден в комнате " + roomId + ".");
+            throw new RuntimeException("Участник не найден в комнате.");
         }
     }
+
 
     public List<String> getParticipants(UUID roomId) {
         return participantsMap.getOrDefault(roomId, new CopyOnWriteArrayList<>());
@@ -108,8 +129,8 @@ public class RoomService {
 
     private void notifyParticipantsChange(UUID roomId) {
         List<String> participants = getParticipants(roomId);
+        System.out.println("Обновление участников для комнаты " + roomId + ": " + participants);
         messagingTemplate.convertAndSend("/topic/participants/" + roomId, participants);
-        System.out.println("Уведомление отправлено в /topic/participants/" + roomId + " с участниками: " + participants);
     }
 
     public void broadcastVideoControl(VideoControlMessage message) {

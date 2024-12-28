@@ -41,7 +41,7 @@ public class ChatController {
         }
 
         ChatMessage savedMessage = chatMessageRepository.save(message);
-        System.out.println("Saved message: " + savedMessage); // Лог сохраненного сообщения
+//        System.out.println("Saved message: " + savedMessage); // Лог сохраненного сообщения
 
         // Расшифровка перед отправкой через WebSocket
         savedMessage.setEncryptedContent(encryptionService.decrypt(savedMessage.getEncryptedContent()));
@@ -71,7 +71,7 @@ public class ChatController {
             }
         });
 
-        System.out.println("Fetched messages for room " + roomId + ": " + messages);
+//        System.out.println("Fetched messages for room " + roomId + ": " + messages);
         return messages;
     }
 
