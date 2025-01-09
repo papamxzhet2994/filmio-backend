@@ -35,7 +35,8 @@ public class RoomController {
                 request.getName(),
                 owner,
                 request.getPassword(),
-                request.isClosed()
+                request.isClosed(),
+                request.getDescription()
         );
     }
 
@@ -52,7 +53,8 @@ public class RoomController {
                         room.isHasPassword(), // Проверяем наличие пароля
                         room.isClosed(),
                         room.getParticipantCount(),
-                        room.getAvatarUrl()
+                        room.getAvatarUrl(),
+                        room.getDescription()
                 ))
                 .toList();
     }
@@ -70,7 +72,8 @@ public class RoomController {
                 room.isHasPassword(), // Проверяем, есть ли пароль
                 room.isClosed(),
                 room.getParticipantCount(),
-                room.getAvatarUrl()
+                room.getAvatarUrl(),
+                room.getDescription()
         );
     }
 
@@ -117,6 +120,20 @@ public class RoomController {
         return roomService.updateRoomName(room, request.getName());
     }
 
+    @PutMapping("/{id}/update-description")
+    public Room updateRoomDescription(
+            @PathVariable UUID id,
+            @RequestBody DescriptionUpdateRequest request,
+            Authentication authentication) {
+        Room room = roomService.getRoomById(id)
+                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
+
+        if (!room.getOwner().equals(authentication.getName())) {
+            throw new RuntimeException("Вы не являетесь владельцем этой комнаты.");
+        }
+
+        return roomService.updateRoomDescription(room, request.getDescription());
+    }
 
     // Удаление комнаты
     @DeleteMapping("/{id}")

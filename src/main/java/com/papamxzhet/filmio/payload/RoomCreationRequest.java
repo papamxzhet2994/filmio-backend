@@ -9,4 +9,5 @@ public class RoomCreationRequest {
     private String name;
     private String password;
     private boolean isClosed;
+    private String description;
 }

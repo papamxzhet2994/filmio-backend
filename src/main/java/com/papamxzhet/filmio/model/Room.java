@@ -34,6 +34,9 @@ public class Room {
 
     private String avatarUrl;
 
+    @Column(length = 500)
+    private String description;
+
     @Transient
     private int participantCount;
 
@@ -51,9 +54,9 @@ public class Room {
         this.isClosed = false;
     }
 
-    // Геттер для поля hasPassword, которое зависит от password
     @JsonProperty("hasPassword")
     public boolean isHasPassword() {
         return password != null && !password.isEmpty();
     }
 }
+

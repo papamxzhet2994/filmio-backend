@@ -38,17 +38,18 @@ public class RoomService {
     private final ConcurrentHashMap<UUID, VideoControlMessage> videoStateMap = new ConcurrentHashMap<>();
 
     @Transactional
-    public Room createRoom(String name, String owner, String rawPassword, boolean isClosed) {
+    public Room createRoom(String name, String owner, String rawPassword, boolean isClosed, String description) {
         String encodedPassword = (rawPassword != null && !rawPassword.trim().isEmpty())
                 ? passwordEncoder.encode(rawPassword)
                 : null;
 
         Room room = new Room(name, owner, encodedPassword);
         room.setClosed(isClosed);
+        room.setDescription(description);
 
         Room savedRoom = roomRepository.save(room);
 
-        participantsMap.putIfAbsent(savedRoom.getId(), new CopyOnWriteArrayList<>()); // Инициализация участников
+        participantsMap.putIfAbsent(savedRoom.getId(), new CopyOnWriteArrayList<>());
         initializeVideoState(savedRoom.getId());
 
         return savedRoom;
@@ -83,6 +84,12 @@ public class RoomService {
     @Transactional
     public Room updateRoomName(Room room, String newName) {
         room.setName(newName);
+        return roomRepository.save(room);
+    }
+
+    @Transactional
+    public Room updateRoomDescription(Room room, String newDescription) {
+        room.setDescription(newDescription);
         return roomRepository.save(room);
     }
 

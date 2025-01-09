@@ -15,8 +15,9 @@ public class RoomResponse {
     private boolean isClosed;
     private int participantCount;
     private String avatarUrl;
+    private String description;
 
-    public RoomResponse(UUID id, String name, String owner, boolean hasPassword, boolean isClosed, int participantCount, String avatarUrl) {
+    public RoomResponse(UUID id, String name, String owner, boolean hasPassword, boolean isClosed, int participantCount, String avatarUrl, String description) {
         this.id = id;
         this.name = name;
         this.owner = owner;
@@ -24,6 +25,7 @@ public class RoomResponse {
         this.isClosed = isClosed;
         this.participantCount = participantCount;
         this.avatarUrl = avatarUrl;
+        this.description = description;
     }
 }
 
