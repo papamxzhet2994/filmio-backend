@@ -26,7 +26,7 @@ public class EncryptionService {
             cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(SECRET_KEY.getBytes(), ALGORITHM));
             return new String(cipher.doFinal(Base64.getDecoder().decode(encryptedData)));
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка расшифровки", e);
+            throw new RuntimeException(e.getMessage());
         }
     }
 }

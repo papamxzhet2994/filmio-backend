@@ -1,7 +1,6 @@
 package com.papamxzhet.filmio.security.jwt;
 
-import com.papamxzhet.filmio.service.CustomUserDetailsService;
-import io.jsonwebtoken.JwtException;
+import com.papamxzhet.filmio.service.UserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,36 +22,37 @@ public class JwtAuthTokenFilter extends OncePerRequestFilter {
     private JwtUtils jwtUtils;
 
     @Autowired
-    private CustomUserDetailsService userDetailsService;
+    private UserDetailsService userDetailsService;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         try {
-            String jwt = parseJwt(request); // Извлекаем токен из заголовка
-            if (jwt != null && jwtUtils.validateJwtToken(jwt)) { // Проверяем токен
-                String username = jwtUtils.getUsernameFromJwtToken(jwt);
+            String jwt = parseJwt(request);
+            if (jwt != null) {
+                boolean isValid = jwtUtils.validateJwtToken(jwt);
+                if (isValid) {
+                    String username = jwtUtils.getUsernameFromJwtToken(jwt);
 
-                // Загружаем пользователя и устанавливаем аутентификацию в контексте
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
 
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.getWriter().write("Invalid or expired JWT token");
+                    return;
+                }
             }
-        } catch (JwtException e) {
-            // Если токен недействителен, отправляем статус 401
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.getWriter().write("Invalid or expired JWT token"); // Сообщение для клиента
-            return; // Завершаем обработку запроса
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write("Authentication failed");
             return;
         }
 
-        filterChain.doFilter(request, response); // Продолжаем цепочку фильтров
+        filterChain.doFilter(request, response);
     }
 
 

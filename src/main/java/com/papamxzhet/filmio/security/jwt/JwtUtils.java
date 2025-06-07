@@ -39,13 +39,13 @@ public class JwtUtils {
                 .getSubject();
     }
 
-    public boolean validateJwtToken(String authToken) {
+    public boolean validateJwtToken(String authToken) throws JwtException {
         try {
             Jwts.parserBuilder().setSigningKey(getSigningKey()).build().parseClaimsJws(authToken);
             return true;
         } catch (JwtException | IllegalArgumentException e) {
             System.out.println("Invalid JWT token: " + e.getMessage());
+            throw new JwtException("Invalid JWT token: " + e.getMessage());
         }
-        return false;
     }
 }

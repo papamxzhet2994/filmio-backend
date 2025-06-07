@@ -6,7 +6,6 @@ import com.papamxzhet.filmio.payload.*;
 import com.papamxzhet.filmio.service.RoomService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -23,14 +22,14 @@ public class RoomController {
     private RoomService roomService;
 
     @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private RoomWebSocketController roomWebSocketController;
 
-    // Создание комнаты
     @PostMapping("/create")
     public Room createRoom(
             @RequestBody RoomCreationRequest request,
             Authentication authentication) {
         String owner = authentication.getName();
+        roomWebSocketController.notifyRoomsUpdate();
         return roomService.createRoom(
                 request.getName(),
                 owner,
@@ -40,8 +39,6 @@ public class RoomController {
         );
     }
 
-
-    // Получение списка всех комнат
     @GetMapping
     public List<RoomResponse> getAllRooms() {
         List<Room> rooms = roomService.getAllRooms();
@@ -50,35 +47,36 @@ public class RoomController {
                         room.getId(),
                         room.getName(),
                         room.getOwner(),
-                        room.isHasPassword(), // Проверяем наличие пароля
+                        room.isHasPassword(),
                         room.isClosed(),
                         room.getParticipantCount(),
                         room.getAvatarUrl(),
-                        room.getDescription()
+                        room.getCoverUrl(),
+                        room.getDescription(),
+                        room.getCreatedAt()
                 ))
                 .toList();
     }
 
-    // Получение комнаты по ID
     @GetMapping("/{id}")
     public RoomResponse getRoomById(@PathVariable UUID id) {
         Room room = roomService.getRoomById(id)
-                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
+                .orElseThrow(() -> new RuntimeException("Room not found"));
 
         return new RoomResponse(
                 room.getId(),
                 room.getName(),
                 room.getOwner(),
-                room.isHasPassword(), // Проверяем, есть ли пароль
+                room.isHasPassword(),
                 room.isClosed(),
                 room.getParticipantCount(),
                 room.getAvatarUrl(),
-                room.getDescription()
+                room.getCoverUrl(),
+                room.getDescription(),
+                room.getCreatedAt()
         );
     }
 
-
-    // Проверка пароля для комнаты
     @PostMapping("/{id}/check-password")
     public boolean checkRoomPassword(
             @PathVariable UUID id,
@@ -88,23 +86,22 @@ public class RoomController {
         return roomService.checkRoomPassword(room, request.getPassword());
     }
 
-    // Обновление пароля комнаты
     @PutMapping("/{id}/update-password")
     public Room updateRoomPassword(
             @PathVariable UUID id,
             @RequestBody PasswordUpdateRequest request,
             Authentication authentication) {
         Room room = roomService.getRoomById(id)
-                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
+                .orElseThrow(() -> new RuntimeException("Room not found"));
 
         if (!room.getOwner().equals(authentication.getName())) {
-            throw new RuntimeException("Вы не являетесь владельцем этой комнаты");
+            throw new RuntimeException("You are not the owner of this room");
         }
 
+        roomWebSocketController.notifyRoomsUpdate();
         return roomService.updateRoomPassword(room, request.getNewPassword());
     }
 
-    // Обновление имени комнаты
     @PutMapping("/{id}/update-name")
     public Room updateRoomName(
             @PathVariable UUID id,
@@ -117,6 +114,8 @@ public class RoomController {
             throw new RuntimeException("Вы не являетесь владельцем этой комнаты");
         }
 
+        roomWebSocketController.notifyRoomsUpdate();
+
         return roomService.updateRoomName(room, request.getName());
     }
 
@@ -126,16 +125,17 @@ public class RoomController {
             @RequestBody DescriptionUpdateRequest request,
             Authentication authentication) {
         Room room = roomService.getRoomById(id)
-                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
+                .orElseThrow(() -> new RuntimeException("Room not found"));
 
         if (!room.getOwner().equals(authentication.getName())) {
-            throw new RuntimeException("Вы не являетесь владельцем этой комнаты.");
+            throw new RuntimeException("You are not the owner of this room");
         }
+
+        roomWebSocketController.notifyRoomsUpdate();
 
         return roomService.updateRoomDescription(room, request.getDescription());
     }
 
-    // Удаление комнаты
     @DeleteMapping("/{id}")
     public void deleteRoom(@PathVariable UUID id, Authentication authentication) {
         Room room = roomService.getRoomById(id)
@@ -145,6 +145,7 @@ public class RoomController {
             throw new RuntimeException("Вы не являетесь владельцем этой комнаты");
         }
 
+        roomWebSocketController.notifyRoomsUpdate();
         roomService.deleteRoom(id);
     }
 
@@ -152,74 +153,60 @@ public class RoomController {
     public void joinRoom(@PathVariable UUID id, Authentication authentication) {
         String username = authentication.getName();
         roomService.addParticipant(id, username);
-        notifyParticipantsChange(id);
-        sendJoinLeaveNotification(id, username, true);
     }
 
     @PostMapping("/{id}/leave")
     public void leaveRoom(@PathVariable UUID id, Authentication authentication) {
         String username = authentication.getName();
         roomService.removeParticipant(id, username);
-        notifyParticipantsChange(id);
-        sendJoinLeaveNotification(id, username, false);
     }
-
-
-    private void sendJoinLeaveNotification(UUID roomId, String username, boolean isJoining) {
-        String message = isJoining
-                ? username + " joined the room."
-                : username + " left the room.";
-        messagingTemplate.convertAndSend("/topic/" + roomId + "/notifications", message);
-    }
-
 
     @PostMapping("/{id}/video-control")
-    public void handleVideoControl(@PathVariable UUID id, @RequestBody VideoControlRequest request) {
-        // Получаем текущее состояние комнаты
-        VideoControlMessage currentState = roomService.getCurrentVideoState(id).orElse(null);
-
-        // Создаем новое сообщение
+    public void handleVideoControl(
+            @PathVariable UUID id,
+            @RequestBody VideoControlRequest request,
+            Authentication authentication
+    ) {
         VideoControlMessage message = new VideoControlMessage(
                 id.toString(),
-                (request.getType().equals("UPDATE_URL")) ? request.getVideoUrl() : (currentState != null ? currentState.getVideoUrl() : null),
+                request.getVideoUrl(),
                 request.getTimestamp(),
-                VideoControlMessage.VideoControlType.valueOf(request.getType())
+                VideoControlMessage.VideoControlType.valueOf(request.getType()),
+                authentication.getName()
         );
 
-        System.out.println("Получено видео-событие: " + message);
+        roomService.updateVideoState(id, message);
 
-        if (message.getType() == VideoControlMessage.VideoControlType.UPDATE_URL) {
-            roomService.updateVideoState(id, message);
-        }
-
-        roomService.broadcastVideoControl(message);
+        roomService.broadcastVideoControl(message, true);
     }
-
 
     @GetMapping("/{roomId}/video-state")
     public VideoControlMessage getVideoState(@PathVariable UUID roomId) {
-        roomService.initializeVideoState(roomId); // Убедиться, что состояние инициализировано
         return roomService.getCurrentVideoState(roomId)
-                .orElseThrow(() -> new RuntimeException("Не удалось получить текущее состояние."));
+                .orElseGet(() -> {
+                    VideoControlMessage initialState = new VideoControlMessage(
+                            roomId.toString(),
+                            "",
+                            0,
+                            VideoControlMessage.VideoControlType.PAUSE
+                    );
+                    roomService.updateVideoState(roomId, initialState);
+                    return initialState;
+                });
     }
 
-
     @PostMapping("/{roomId}/seek")
-    public void seekVideo(@PathVariable UUID roomId, @RequestBody SeekRequest request) {
+    public void seekVideo(
+            @PathVariable UUID roomId,
+            @RequestBody SeekRequest request,
+            Authentication authentication) {
         VideoControlMessage message = new VideoControlMessage();
         message.setRoomId(roomId.toString());
         message.setTimestamp(request.getTimestamp());
         message.setType(VideoControlMessage.VideoControlType.SEEK);
+        message.setInitiator(authentication.getName());
 
-        // Broadcast the seek event to all participants
-        roomService.broadcastVideoControl(message);
-    }
-
-    // Уведомление участников о изменениях
-    private void notifyParticipantsChange(UUID roomId) {
-        List<String> participants = roomService.getParticipants(roomId);
-        System.out.println("Список участников комнаты после изменений: " + participants);
-        messagingTemplate.convertAndSend("/topic/participants/" + roomId, participants);
+        roomService.broadcastVideoControl(message, true);
     }
 
     @PostMapping("/{id}/remove-participant")
@@ -227,26 +214,6 @@ public class RoomController {
             @PathVariable UUID id,
             @RequestBody ParticipantRemoveRequest request,
             Authentication authentication) {
-        System.out.println("Запрос на удаление участника: " + request.getUsername());
-
-        Room room = roomService.getRoomById(id)
-                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
-
-        if (!room.getOwner().equals(authentication.getName())) {
-            throw new RuntimeException("Вы не являетесь владельцем этой комнаты.");
-        }
-
-        roomService.removeParticipant(id, request.getUsername());
-        System.out.println("Участник удалён: " + request.getUsername());
-
-        return ResponseEntity.ok("Участник успешно удалён.");
-    }
-
-    @PostMapping("/{id}/upload-avatar")
-    public Room uploadAvatar(
-            @PathVariable UUID id,
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication) throws IOException {
         Room room = roomService.getRoomById(id)
                 .orElseThrow(() -> new RuntimeException("Room not found"));
 
@@ -254,8 +221,44 @@ public class RoomController {
             throw new RuntimeException("You are not the owner of this room");
         }
 
+        roomService.forceRemoveParticipant(id, request.getUsername());
+        return ResponseEntity.ok("Participant successfully removed");
+    }
+
+
+    @PostMapping("/{id}/upload-avatar")
+    public Room uploadAvatar(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) throws Exception {
+        Room room = roomService.getRoomById(id)
+                .orElseThrow(() -> new RuntimeException("Комната не найдена"));
+
+        if (!room.getOwner().equals(authentication.getName())) {
+            throw new RuntimeException("Вы не являетесь владельцем этой комнаты");
+        }
+
         String avatarUrl = roomService.saveAvatar(file);
         room.setAvatarUrl(avatarUrl);
+        roomWebSocketController.notifyRoomsUpdate();
+        return roomService.updateRoom(room);
+    }
+
+    @PostMapping("/{id}/upload-cover")
+    public Room uploadCover(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) throws Exception {
+        Room room = roomService.getRoomById(id)
+                .orElseThrow(() -> new RuntimeException("Room not found"));
+
+        if (!room.getOwner().equals(authentication.getName())) {
+            throw new RuntimeException("You are not the owner of this room");
+        }
+
+        String coverUrl = roomService.saveCover(file);
+        room.setCoverUrl(coverUrl);
+        roomWebSocketController.notifyRoomsUpdate();
         return roomService.updateRoom(room);
     }
 }

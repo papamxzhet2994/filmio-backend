@@ -1,85 +1,76 @@
 package com.papamxzhet.filmio.controller;
 
 import com.papamxzhet.filmio.model.User;
-import com.papamxzhet.filmio.payload.JwtResponse;
-import com.papamxzhet.filmio.payload.LoginRequest;
-import com.papamxzhet.filmio.security.jwt.JwtUtils;
-import com.papamxzhet.filmio.service.CustomUserDetailsService;
-import com.papamxzhet.filmio.service.UserService;
+import com.papamxzhet.filmio.payload.*;
+import com.papamxzhet.filmio.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "http://localhost:3000", allowCredentials = "true")
+@CrossOrigin(origins = "${cors.allowed-origins}", allowCredentials = "true")
 public class AuthController {
 
     @Autowired
-    private AuthenticationManager authenticationManager;
-
-    @Autowired
-    private UserService userService;
-
-    @Autowired
-    private JwtUtils jwtUtils;
-
-    @Autowired
-    private CustomUserDetailsService userDetailsService;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
+    private AuthService authService;
 
     @PostMapping("/login")
     public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest loginRequest) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
-            );
+        return authService.authenticateUser(loginRequest);
+    }
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+    @PostMapping("/verify-code")
+    public ResponseEntity<?> verifyCode(@Valid @RequestBody VerifyCodeRequest verifyRequest) {
+        return authService.verifyCode(verifyRequest);
+    }
 
-            String jwt = jwtUtils.generateJwtToken(authentication.getName()); // Генерация JWT токена
-
-            return ResponseEntity.ok(new JwtResponse(jwt, loginRequest.getUsername()));
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Error: " + e.getMessage());
-        }
+    @PostMapping("/resend-verification")
+    public ResponseEntity<?> resendVerificationEmail(@Valid @RequestBody Map<String, String> request) {
+        return authService.resendVerificationEmail(request);
     }
 
     @PostMapping("/register")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody User user) {
-        if (userService.existsByUsername(user.getUsername())) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Error: Username is already taken!");
-        }
-
-        if (userService.existsByEmail(user.getEmail())) {
-            return ResponseEntity
-                    .badRequest()
-                    .body("Error: Email is already in use!");
-        }
-
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        userService.saveUser(user);
-
-        return ResponseEntity.ok("User registered successfully!");
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest registerRequest) {
+        return authService.registerUser(registerRequest);
     }
 
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@Valid @RequestBody VerifyCodeRequest verifyRequest) {
+        return authService.verifyEmail(verifyRequest);
+    }
+
+    @PostMapping("/enable-2fa")
+    public ResponseEntity<?> enable2FA(Authentication authentication) {
+        return authService.enable2FA(authentication);
+    }
+
+    @PostMapping("/disable-2fa")
+    public ResponseEntity<?> disable2FA(Authentication authentication) {
+        return authService.disable2FA(authentication);
+    }
 
     @GetMapping("/me")
     public User getCurrentUser(Authentication authentication) {
-        String username = authentication.getName();
-        return userService.findByUsername(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+        return authService.getCurrentUser(authentication);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        return authService.forgotPassword(request);
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest request) {
+        return authService.resetPassword(request);
+    }
+
+    @GetMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestParam String token) {
+        return authService.validateResetToken(token);
     }
 }

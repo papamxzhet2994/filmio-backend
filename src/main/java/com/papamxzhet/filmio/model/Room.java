@@ -7,8 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Setter
@@ -32,26 +31,31 @@ public class Room {
 
     private boolean isClosed;
 
+    @Column(length = 500)
     private String avatarUrl;
+
+    @Column(length = 500)
+    private String coverUrl;
 
     @Column(length = 500)
     private String description;
 
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
     @Transient
     private int participantCount;
 
-    @ElementCollection(fetch = FetchType.EAGER)
-    @CollectionTable(name = "room_participants", joinColumns = @JoinColumn(name = "room_id"))
-    @Column(name = "participant")
-    private Set<String> participants = new HashSet<>();
-
-    public Room() {}
+    public Room() {
+        this.createdAt = LocalDateTime.now();
+    }
 
     public Room(String name, String owner, String password) {
         this.name = name;
         this.owner = owner;
         this.password = password;
         this.isClosed = false;
+        this.createdAt = LocalDateTime.now();
     }
 
     @JsonProperty("hasPassword")
@@ -59,4 +63,3 @@ public class Room {
         return password != null && !password.isEmpty();
     }
 }
-

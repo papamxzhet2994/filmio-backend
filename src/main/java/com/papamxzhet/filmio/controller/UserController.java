@@ -3,6 +3,7 @@ package com.papamxzhet.filmio.controller;
 import com.papamxzhet.filmio.model.SocialLink;
 import com.papamxzhet.filmio.model.User;
 import com.papamxzhet.filmio.payload.UserProfileResponse;
+import com.papamxzhet.filmio.service.MinioService;
 import com.papamxzhet.filmio.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -11,12 +12,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
+import java.util.Objects;
+import java.util.Optional;
+
 
 @RestController
 @RequestMapping("/api/users")
@@ -24,6 +24,9 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private MinioService minioService;
 
     @PutMapping("/{id}/change-password")
     public ResponseEntity<String> changePassword(
@@ -73,35 +76,62 @@ public class UserController {
 
 
     @PostMapping("/{id}/upload-avatar")
-    public ResponseEntity<String> uploadAvatar(@PathVariable Long id,
-                                               @RequestParam("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            return ResponseEntity.badRequest().body("Файл не может быть пустым");
-        }
-
+    public ResponseEntity<?> uploadAvatar(@PathVariable Long id,
+                                          @RequestParam("file") MultipartFile file) {
         try {
-            String uploadDir = "uploads/";
-            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
-            Path filePath = Paths.get(uploadDir, fileName);
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().body("Файл не может быть пустым");
+            }
 
-            Files.createDirectories(filePath.getParent());
+            if (!Objects.requireNonNull(file.getContentType()).startsWith("image/")) {
+                return ResponseEntity.badRequest().body("Разрешены только изображения");
+            }
 
-            Files.copy(file.getInputStream(), filePath);
-
-            String avatarUrl = "/uploads/" + fileName;
+            String fileKey = minioService.uploadFile(file);
+            String avatarUrl = minioService.getPresignedUrl(fileKey);
 
             userService.updateAvatar(id, avatarUrl);
 
-            return ResponseEntity.ok(avatarUrl);
+            return ResponseEntity.ok(Map.of(
+                    "avatarUrl", avatarUrl,
+                    "message", "Аватар успешно загружен"
+            ));
+
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Ошибка при загрузке файла: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ошибка чтения файла: " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ошибка загрузки: " + e.getMessage());
         }
     }
 
     @DeleteMapping("/{id}/avatar")
     public ResponseEntity<String> deleteAvatar(@PathVariable Long id) {
-        userService.removeAvatar(id);
-        return ResponseEntity.ok("Аватар удалён");
+        try {
+            Optional<User> userOptional = userService.getUserById(id);
+
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body("Пользователь не найден");
+            }
+
+            User user = userOptional.get();
+            String currentAvatar = user.getAvatarUrl();
+
+            if (currentAvatar != null) {
+                String fileKey = currentAvatar.substring(currentAvatar.lastIndexOf("/") + 1);
+
+                minioService.deleteFile(fileKey);
+            }
+
+            userService.removeAvatar(id);
+
+            return ResponseEntity.ok("Аватар удалён");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Ошибка удаления: " + e.getMessage());
+        }
     }
 
     @PostMapping("/{id}/social-links")

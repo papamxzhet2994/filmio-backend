@@ -8,6 +8,6 @@ import lombok.Setter;
 public class RoomCreationRequest {
     private String name;
     private String password;
-    private boolean isClosed;
+    private boolean closed;
     private String description;
 }

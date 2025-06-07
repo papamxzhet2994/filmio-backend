@@ -8,5 +8,5 @@ import lombok.Setter;
 public class VideoControlRequest {
     private String videoUrl;
     private double timestamp;
-    private String type;  // PLAY, PAUSE, SEEK, UPDATE_URL
+    private String type;
 }

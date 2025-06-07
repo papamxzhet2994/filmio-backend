@@ -35,6 +35,7 @@ public class User {
     @Size(min = 6, message = "Пароль должен содержать не менее 6 символов")
     private String password;
 
+    @Column(length = 1024)
     private String avatarUrl;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -44,11 +45,36 @@ public class User {
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
+    // 2FA fields
+    @Column(name = "two_factor_enabled")
+    private boolean twoFactorEnabled = false;
+
+    @Column(name = "verification_code")
+    private String verificationCode;
+
+    @Column(name = "verification_code_expiry")
+    private LocalDateTime verificationCodeExpiry;
+
+    @Column(name = "email_verified")
+    private boolean emailVerified = false;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = LocalDateTime.now();
         }
     }
+
+    public boolean isVerificationCodeValid() {
+        return verificationCode != null &&
+                verificationCodeExpiry != null &&
+                LocalDateTime.now().isBefore(verificationCodeExpiry);
+    }
+
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_token_expiry")
+    private LocalDateTime passwordResetTokenExpiry;
 
 }

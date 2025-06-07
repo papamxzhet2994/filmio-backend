@@ -63,7 +63,6 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
 
-        // Delete associated social links
         socialLinkRepository.deleteAllByUserId(userId);
 
         if (user.getAvatarUrl() != null) {
@@ -133,4 +132,12 @@ public class UserService {
         return userRepository.findByUsername(username);
     }
 
+    public Optional<User> getUserById(Long id) {
+        return userRepository.findById(id);
+    }
+
+
+    public Optional<User> findByEmail(String email) {
+        return userRepository.findByEmail(email);
+    }
 }
